@@ -1,0 +1,1909 @@
+[
+    {
+        "id": "cb9721485cdb3daa",
+        "type": "tab",
+        "label": "Starlink Advanced Stats Dashboard",
+        "disabled": false,
+        "info": ""
+    },
+    {
+        "id": "73d1c076bfd8700d",
+        "type": "mqtt in",
+        "z": "cb9721485cdb3daa",
+        "name": "Raw status",
+        "topic": "starlink/mini/raw_status",
+        "qos": "0",
+        "datatype": "auto",
+        "broker": "a9e4ba8d9b3fe116",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 150,
+        "y": 80,
+        "wires": [
+            [
+                "8bfa4d109f31a58f"
+            ]
+        ]
+    },
+    {
+        "id": "8bfa4d109f31a58f",
+        "type": "json",
+        "z": "cb9721485cdb3daa",
+        "name": "Parse raw JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 360,
+        "y": 80,
+        "wires": [
+            [
+                "d4b6d830fa9d16fe"
+            ]
+        ]
+    },
+    {
+        "id": "d4b6d830fa9d16fe",
+        "type": "function",
+        "z": "cb9721485cdb3daa",
+        "name": "Extract advanced metrics",
+        "func": "// Expect msg.payload to be either a parsed object or JSON string\nlet p = msg.payload;\n\nif (typeof p === \"string\") {\n    try {\n        p = JSON.parse(p);\n    } catch (e) {\n        node.warn(\"Failed to parse payload as JSON: \" + e.message);\n        node.warn(\"Raw payload: \" + msg.payload);\n        return null;\n    }\n}\n\nif (!p || !p.status) {\n    node.warn(\"No 'status' field found in payload: \" + JSON.stringify(p));\n    return null;\n}\n\nconst s = p.status || {};\nconst devInfo = s.device_info || {};\nconst devState = s.device_state || {};\nconst obst = s.obstruction_stats || {};\nconst gps = s.gps_stats || {};\nconst alerts = s.alerts || {};\nconst ready = s.ready_states || {};\nconst swstats = s.software_update_stats || {};\nconst align = s.alignment_stats || {};\nconst initDur = s.initialization_duration_seconds || {};\n\nfunction mbps(bps) {\n    if (bps === null || bps === undefined || isNaN(bps)) return 0;\n    return Number((Number(bps) / 1_000_000).toFixed(3));\n}\n\nfunction formatDuration(sec) {\n    if (!sec || isNaN(sec)) return \"0s\";\n    sec = Number(sec);\n    const days = Math.floor(sec / 86400);\n    sec %= 86400;\n    const hours = Math.floor(sec / 3600);\n    sec %= 3600;\n    const mins = Math.floor(sec / 60);\n    const secs = Math.floor(sec % 60);\n    let parts = [];\n    if (days) parts.push(`${days}d`);\n    if (hours) parts.push(`${hours}h`);\n    if (mins) parts.push(`${mins}m`);\n    if (secs) parts.push(`${secs}s`);\n    return parts.length ? parts.join(\" \") : \"0s\";\n}\n\nconst out = {\n    // core fields\n    stable_connection: initDur.stable_connection ?? null,\n    software_update_state: s.software_update_state ?? null,\n    class_of_service: s.class_of_service ?? null,\n    mobility_class: s.mobility_class ?? null,\n    gps_valid: gps.gps_valid ?? null,\n    gps_sats: gps.gps_sats ?? null,\n    downlink_mbps: mbps(s.downlink_throughput_bps),\n    uplink_mbps: mbps(s.uplink_throughput_bps),\n    pop_ping_latency_ms: s.pop_ping_latency_ms ?? null,\n\n    // alerts / link flags\n    roaming: alerts.roaming ?? null,\n    install_pending: alerts.install_pending ?? null,\n    eth_speed_mbps: s.eth_speed_mbps ?? null,\n    snr_above_noise_floor: s.is_snr_above_noise_floor ?? null,\n\n    // device info\n    hardware_version: devInfo.hardware_version ?? null,\n    software_version: devInfo.software_version ?? null,\n    generation_number: devInfo.generation_number ?? null,\n    uptime_s: devState.uptime_s ? Number(devState.uptime_s) : null,\n\n    // NEW: bootcount\n    bootcount: devInfo.bootcount ?? null,\n\n    // obstruction stats (no percent in this payload)\n    obstruction_valid_s: obst.valid_s ?? null,\n    obstruction_valid_friendly: obst.valid_s != null ? formatDuration(obst.valid_s) : null,\n    obstruction_patches_valid: obst.patches_valid ?? null,\n    obstruction_avg_prolonged_interval_s: obst.avg_prolonged_obstruction_interval_s ?? null,\n\n    // alignment & pointing\n    boresight_azimuth_deg: s.boresight_azimuth_deg ?? align.boresight_azimuth_deg ?? null,\n    boresight_elevation_deg: s.boresight_elevation_deg ?? align.boresight_elevation_deg ?? null,\n    tilt_angle_deg: align.tilt_angle_deg ?? null,\n    attitude_estimation_state: align.attitude_estimation_state ?? null,\n    attitude_uncertainty_deg: align.attitude_uncertainty_deg ?? null,\n    desired_boresight_azimuth_deg: align.desired_boresight_azimuth_deg ?? null,\n    desired_boresight_elevation_deg: align.desired_boresight_elevation_deg ?? null,\n\n    // software update details\n    sw_update_progress: swstats.software_update_progress ?? null,\n\n    // hardware / health flags\n    has_actuators: s.has_actuators ?? align.has_actuators ?? null,\n    disablement_code: s.disablement_code ?? null,\n    has_signed_cals: s.has_signed_cals ?? null,\n\n    // ready states\n    ready_scp: ready.scp ?? null,\n    ready_l1l2: ready.l1l2 ?? null,\n    ready_xphy: ready.xphy ?? null,\n    ready_aap: ready.aap ?? null,\n    ready_rf: ready.rf ?? null,\n\n    // identity\n    ts: p.ts,\n    dish_id: p.dish_id,\n    serial: p.serial\n};\n\nmsg.payload = out;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 600,
+        "y": 80,
+        "wires": [
+            [
+                "ca383b48b40f10c8",
+                "4d9f772dc24381de",
+                "05d796d3ea9dd666",
+                "b335ba8b7e038d55",
+                "7c9a0f258fdab76c",
+                "92f58f6ba3922596",
+                "84eb6f7a9b49623a",
+                "c58d3adc6941a76d",
+                "32e54fde294f0de4",
+                "1d19542048af1b38",
+                "f55dc04b6ee80034",
+                "1f1881a28da3119d",
+                "8f569b3de94eefb9",
+                "fecd85e5ea04ad55",
+                "efb044f0e7c69943",
+                "7fbd2048e5556533",
+                "a84cf5986a2944c1",
+                "b475a1fe34543e65",
+                "b57b3bdc06c77171",
+                "eae5e7a0568d0788",
+                "35995e66b0256622",
+                "9e0d6dd9972a3a54",
+                "e8b1b563dac3eb36",
+                "877b5e507cc6636d",
+                "a63db9b9c0dc11a0",
+                "191214a70d4c237b",
+                "b831d5f134656276",
+                "f87a5d657ff02911",
+                "07e50808fcfb459c",
+                "b95ae08afbae0e99",
+                "20a1721fd26dcef3",
+                "e7b7e66d6ba0dc4a",
+                "78fecb66193462f1",
+                "20c2e61e73b835d1"
+            ]
+        ]
+    },
+    {
+        "id": "ca383b48b40f10c8",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "SW update state",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.software_update_state",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 880,
+        "y": 40,
+        "wires": [
+            [
+                "4a32157e1b2093f6"
+            ]
+        ]
+    },
+    {
+        "id": "4a32157e1b2093f6",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "fe6e4ba753411670",
+        "order": 1,
+        "width": "6",
+        "height": "1",
+        "name": "SW update text",
+        "label": "SW update state",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1170,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "4d9f772dc24381de",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Class of service",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.class_of_service",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 890,
+        "y": 80,
+        "wires": [
+            [
+                "a0d920f9f1f182e4"
+            ]
+        ]
+    },
+    {
+        "id": "a0d920f9f1f182e4",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "fe6e4ba753411670",
+        "order": 2,
+        "width": "6",
+        "height": "1",
+        "name": "Class of service text",
+        "label": "Class of service",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "05d796d3ea9dd666",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Mobility class",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.mobility_class",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 880,
+        "y": 120,
+        "wires": [
+            [
+                "a4509d0bc29aaa7d"
+            ]
+        ]
+    },
+    {
+        "id": "a4509d0bc29aaa7d",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "fe6e4ba753411670",
+        "order": 3,
+        "width": "6",
+        "height": "1",
+        "name": "Mobility class text",
+        "label": "Mobility class",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "f55dc04b6ee80034",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Stable connection (s)",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.stable_connection",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 910,
+        "y": 160,
+        "wires": [
+            [
+                "5a143c5c440fcf3c"
+            ]
+        ]
+    },
+    {
+        "id": "5a143c5c440fcf3c",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "fe6e4ba753411670",
+        "order": 4,
+        "width": "6",
+        "height": "1",
+        "name": "Stable connection text",
+        "label": "Stable connection",
+        "format": "{{msg.payload}} s",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "b335ba8b7e038d55",
+        "type": "function",
+        "z": "cb9721485cdb3daa",
+        "name": "Format uptime",
+        "func": "const s = msg.payload;\nlet sec = Number(s.uptime_s || 0);\n\nfunction format(sec) {\n    const d = Math.floor(sec / 86400);\n    sec -= d * 86400;\n    const h = Math.floor(sec / 3600);\n    sec -= h * 3600;\n    const m = Math.floor(sec / 60);\n    sec -= m * 60;\n    const s2 = sec;\n\n    const parts = [];\n    if (d) parts.push(d + \"d\");\n    if (h) parts.push(h + \"h\");\n    if (m) parts.push(m + \"m\");\n    parts.push(s2 + \"s\");\n    return parts.join(\" \");\n}\n\nmsg.payload = {\n    raw: Number(s.uptime_s || 0),\n    text: format(sec)\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 880,
+        "y": 210,
+        "wires": [
+            [
+                "99c700a779eed364",
+                "cfcbb2efc5ac8d8a"
+            ]
+        ]
+    },
+    {
+        "id": "99c700a779eed364",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "fe6e4ba753411670",
+        "order": 5,
+        "width": "6",
+        "height": "1",
+        "name": "Uptime text",
+        "label": "Uptime",
+        "format": "{{msg.payload.text}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "cfcbb2efc5ac8d8a",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Uptime hours",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.raw / 3600",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 900,
+        "y": 250,
+        "wires": [
+            [
+                "ce633e43753f5490"
+            ]
+        ]
+    },
+    {
+        "id": "ce633e43753f5490",
+        "type": "ui_gauge",
+        "z": "cb9721485cdb3daa",
+        "name": "Uptime gauge",
+        "group": "fe6e4ba753411670",
+        "order": 6,
+        "width": "6",
+        "height": "3",
+        "gtype": "donut",
+        "title": "Uptime (hours)",
+        "label": "h",
+        "format": "{{value | number:2}}",
+        "min": 0,
+        "max": "48",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1180,
+        "y": 250,
+        "wires": []
+    },
+    {
+        "id": "7c9a0f258fdab76c",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Ping latency ms",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.pop_ping_latency_ms",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 890,
+        "y": 300,
+        "wires": [
+            [
+                "5270e3623912f35c",
+                "ef575700596dff6d"
+            ]
+        ]
+    },
+    {
+        "id": "5270e3623912f35c",
+        "type": "ui_gauge",
+        "z": "cb9721485cdb3daa",
+        "name": "Ping gauge",
+        "group": "fe6e4ba753411670",
+        "order": 7,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "POP ping (ms)",
+        "label": "ms",
+        "format": "{{value  | number:0}}",
+        "min": 0,
+        "max": "200",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1180,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "ef575700596dff6d",
+        "type": "ui_chart",
+        "z": "cb9721485cdb3daa",
+        "name": "Ping history",
+        "group": "fe6e4ba753411670",
+        "order": 8,
+        "width": "6",
+        "height": "3",
+        "label": "POP ping latency over time",
+        "chartType": "line",
+        "legend": "false",
+        "xformat": "auto",
+        "interpolate": "linear",
+        "nodata": "",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "200",
+        "removeOlder": "6",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "3600",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#2ca02c",
+            "#aec7e8",
+            "#1f77b4",
+            "#ff7f0e",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 1810,
+        "y": 420,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "92f58f6ba3922596",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Downlink Mbps",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.downlink_mbps",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 880,
+        "y": 400,
+        "wires": [
+            [
+                "91a4220441ce28dd",
+                "be64b32a330d045f"
+            ]
+        ]
+    },
+    {
+        "id": "91a4220441ce28dd",
+        "type": "ui_gauge",
+        "z": "cb9721485cdb3daa",
+        "name": "Downlink gauge",
+        "group": "82f60ef2136fdbc9",
+        "order": 1,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "Downlink (Mbps)",
+        "label": "Mbps",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "200",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1180,
+        "y": 380,
+        "wires": []
+    },
+    {
+        "id": "be64b32a330d045f",
+        "type": "ui_chart",
+        "z": "cb9721485cdb3daa",
+        "name": "Downlink history",
+        "group": "82f60ef2136fdbc9",
+        "order": 2,
+        "width": "6",
+        "height": "3",
+        "label": "Downlink over time",
+        "chartType": "line",
+        "legend": "false",
+        "xformat": "auto",
+        "interpolate": "linear",
+        "nodata": "",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "200",
+        "removeOlder": "6",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "3600",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#1f77b4",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 1820,
+        "y": 480,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "84eb6f7a9b49623a",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Uplink Mbps",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.uplink_mbps",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 870,
+        "y": 460,
+        "wires": [
+            [
+                "34be90d18ac80315",
+                "96eb406f2738811c"
+            ]
+        ]
+    },
+    {
+        "id": "34be90d18ac80315",
+        "type": "ui_gauge",
+        "z": "cb9721485cdb3daa",
+        "name": "Uplink gauge",
+        "group": "82f60ef2136fdbc9",
+        "order": 3,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "Uplink (Mbps)",
+        "label": "Mbps",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "50",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1180,
+        "y": 460,
+        "wires": []
+    },
+    {
+        "id": "96eb406f2738811c",
+        "type": "ui_chart",
+        "z": "cb9721485cdb3daa",
+        "name": "Uplink history",
+        "group": "82f60ef2136fdbc9",
+        "order": 4,
+        "width": "6",
+        "height": "3",
+        "label": "Uplink over time",
+        "chartType": "line",
+        "legend": "false",
+        "xformat": "auto",
+        "interpolate": "linear",
+        "nodata": "",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "50",
+        "removeOlder": "6",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "3600",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#ff7f0e",
+            "#aec7e8",
+            "#1f77b4",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 1820,
+        "y": 540,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "c58d3adc6941a76d",
+        "type": "function",
+        "z": "cb9721485cdb3daa",
+        "name": "GPS text",
+        "func": "const p = msg.payload;\nconst sats = p.gps_sats ?? \"?\";\nif (p.gps_valid === true) {\n    msg.payload = `Valid (${sats} sats)`;\n} else if (p.gps_valid === false) {\n    msg.payload = `Invalid (${sats} sats)`;\n} else {\n    msg.payload = `Unknown (${sats} sats)`;\n}\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 870,
+        "y": 560,
+        "wires": [
+            [
+                "76cd25dd19170a82"
+            ]
+        ]
+    },
+    {
+        "id": "76cd25dd19170a82",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "ab8889c39bb8d818",
+        "order": 1,
+        "width": "6",
+        "height": "1",
+        "name": "GPS status text",
+        "label": "GPS",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 560,
+        "wires": []
+    },
+    {
+        "id": "b57b3bdc06c77171",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Boresight az",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.boresight_azimuth_deg",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 870,
+        "y": 600,
+        "wires": [
+            [
+                "2750f8f1fb9f27f9"
+            ]
+        ]
+    },
+    {
+        "id": "2750f8f1fb9f27f9",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "ab8889c39bb8d818",
+        "order": 2,
+        "width": "6",
+        "height": "1",
+        "name": "Boresight az text",
+        "label": "Boresight azimuth",
+        "format": "{{msg.payload}}°",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "eae5e7a0568d0788",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Boresight el",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.boresight_elevation_deg",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 870,
+        "y": 640,
+        "wires": [
+            [
+                "d970b56059f3354c"
+            ]
+        ]
+    },
+    {
+        "id": "d970b56059f3354c",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "ab8889c39bb8d818",
+        "order": 3,
+        "width": "6",
+        "height": "1",
+        "name": "Boresight el text",
+        "label": "Boresight elevation",
+        "format": "{{msg.payload}}°",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 640,
+        "wires": []
+    },
+    {
+        "id": "35995e66b0256622",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Tilt angle",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.tilt_angle_deg",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 860,
+        "y": 680,
+        "wires": [
+            [
+                "fed2d1faa12a3f1d"
+            ]
+        ]
+    },
+    {
+        "id": "fed2d1faa12a3f1d",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "ab8889c39bb8d818",
+        "order": 4,
+        "width": "6",
+        "height": "1",
+        "name": "Tilt text",
+        "label": "Tilt angle",
+        "format": "{{msg.payload}}°",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "9e0d6dd9972a3a54",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Attitude state",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.attitude_estimation_state",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 880,
+        "y": 720,
+        "wires": [
+            [
+                "0f3e771168e46860"
+            ]
+        ]
+    },
+    {
+        "id": "0f3e771168e46860",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "ab8889c39bb8d818",
+        "order": 5,
+        "width": "6",
+        "height": "1",
+        "name": "Attitude state text",
+        "label": "Attitude est. state",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "e8b1b563dac3eb36",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Attitude unc.",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.attitude_uncertainty_deg",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 880,
+        "y": 760,
+        "wires": [
+            [
+                "c8cd4ba241abfea2"
+            ]
+        ]
+    },
+    {
+        "id": "c8cd4ba241abfea2",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "ab8889c39bb8d818",
+        "order": 6,
+        "width": "6",
+        "height": "1",
+        "name": "Attitude unc text",
+        "label": "Attitude uncertainty",
+        "format": "{{msg.payload}}°",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 760,
+        "wires": []
+    },
+    {
+        "id": "877b5e507cc6636d",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Desired az",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.desired_boresight_azimuth_deg",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 890,
+        "y": 800,
+        "wires": [
+            [
+                "1242fb75f5bad181"
+            ]
+        ]
+    },
+    {
+        "id": "1242fb75f5bad181",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "ab8889c39bb8d818",
+        "order": 7,
+        "width": "6",
+        "height": "1",
+        "name": "Desired az text",
+        "label": "Desired azimuth",
+        "format": "{{msg.payload}}°",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 800,
+        "wires": []
+    },
+    {
+        "id": "a63db9b9c0dc11a0",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Desired el",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.desired_boresight_elevation_deg",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 890,
+        "y": 840,
+        "wires": [
+            [
+                "146ff7f1ccecec32"
+            ]
+        ]
+    },
+    {
+        "id": "146ff7f1ccecec32",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "ab8889c39bb8d818",
+        "order": 8,
+        "width": "6",
+        "height": "1",
+        "name": "Desired el text",
+        "label": "Desired elevation",
+        "format": "{{msg.payload}}°",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 840,
+        "wires": []
+    },
+    {
+        "id": "7fbd2048e5556533",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "d": true,
+        "name": "Obstruction valid_s",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.obstruction_valid_s",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 910,
+        "y": 880,
+        "wires": [
+            [
+                "78fecb66193462f1"
+            ]
+        ]
+    },
+    {
+        "id": "1230febd47f0336e",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "060daa901ca892b7",
+        "order": 1,
+        "width": "6",
+        "height": "1",
+        "name": "Obstruction valid text",
+        "label": "Obstruction valid",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 1540,
+        "y": 880,
+        "wires": []
+    },
+    {
+        "id": "a84cf5986a2944c1",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Obstruction patches",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.obstruction_patches_valid",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 910,
+        "y": 920,
+        "wires": [
+            [
+                "7bdf17c60f2119c5"
+            ]
+        ]
+    },
+    {
+        "id": "7bdf17c60f2119c5",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "060daa901ca892b7",
+        "order": 4,
+        "width": "6",
+        "height": "1",
+        "name": "Obstruction patches text",
+        "label": "Obstruction patches valid",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 920,
+        "wires": []
+    },
+    {
+        "id": "b475a1fe34543e65",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Obstruction avg interval",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.obstruction_avg_prolonged_interval_s",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 930,
+        "y": 960,
+        "wires": [
+            [
+                "efd4eadae93973d5"
+            ]
+        ]
+    },
+    {
+        "id": "efd4eadae93973d5",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "060daa901ca892b7",
+        "order": 5,
+        "width": "6",
+        "height": "1",
+        "name": "Obstruction avg text",
+        "label": "Obstruction avg. prolonged interval",
+        "format": "{{msg.payload}} s",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 960,
+        "wires": []
+    },
+    {
+        "id": "1f1881a28da3119d",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Hardware version",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.hardware_version",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 890,
+        "y": 1000,
+        "wires": [
+            [
+                "27a9bb0180e43264"
+            ]
+        ]
+    },
+    {
+        "id": "27a9bb0180e43264",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 1,
+        "width": "6",
+        "height": "1",
+        "name": "HW version text",
+        "label": "Hardware version",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1000,
+        "wires": []
+    },
+    {
+        "id": "8f569b3de94eefb9",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Software version",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.software_version",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 900,
+        "y": 1040,
+        "wires": [
+            [
+                "d846c7a58b27ad14"
+            ]
+        ]
+    },
+    {
+        "id": "d846c7a58b27ad14",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 2,
+        "width": "6",
+        "height": "1",
+        "name": "SW version text",
+        "label": "Software version",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1040,
+        "wires": []
+    },
+    {
+        "id": "fecd85e5ea04ad55",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Generation number",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.generation_number",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 910,
+        "y": 1080,
+        "wires": [
+            [
+                "b1d7b8c5b18e655f"
+            ]
+        ]
+    },
+    {
+        "id": "b1d7b8c5b18e655f",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 3,
+        "width": "6",
+        "height": "1",
+        "name": "Generation number text",
+        "label": "Generation number",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1080,
+        "wires": []
+    },
+    {
+        "id": "efb044f0e7c69943",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "SW progress %",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.sw_update_progress * 100",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 900,
+        "y": 1120,
+        "wires": [
+            [
+                "b090bfc2f59a2618"
+            ]
+        ]
+    },
+    {
+        "id": "b090bfc2f59a2618",
+        "type": "ui_gauge",
+        "z": "cb9721485cdb3daa",
+        "name": "SW progress gauge",
+        "group": "b46d43e259dfd7b6",
+        "order": 4,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "SW update progress",
+        "label": "%",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "100",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1180,
+        "y": 1120,
+        "wires": []
+    },
+    {
+        "id": "32e54fde294f0de4",
+        "type": "function",
+        "z": "cb9721485cdb3daa",
+        "name": "Roaming/install text",
+        "func": "const p = msg.payload;\nconst roaming = p.roaming === true ? \"roaming\" : \"not roaming\";\nconst install = p.install_pending === true ? \"install pending\" : \"install ok\";\nmsg.payload = `${roaming}, ${install}`;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 910,
+        "y": 1160,
+        "wires": [
+            [
+                "264bfea3b42007f0"
+            ]
+        ]
+    },
+    {
+        "id": "264bfea3b42007f0",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 5,
+        "width": "6",
+        "height": "1",
+        "name": "Roaming/install text",
+        "label": "Roaming / install",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1160,
+        "wires": []
+    },
+    {
+        "id": "1d19542048af1b38",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Eth speed",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.eth_speed_mbps",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 860,
+        "y": 1200,
+        "wires": [
+            [
+                "39cfdf569998157f"
+            ]
+        ]
+    },
+    {
+        "id": "39cfdf569998157f",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 6,
+        "width": "6",
+        "height": "1",
+        "name": "Eth speed text",
+        "label": "Ethernet link speed",
+        "format": "{{msg.payload}} Mbps",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1200,
+        "wires": []
+    },
+    {
+        "id": "191214a70d4c237b",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "SNR above noise",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.snr_above_noise_floor",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 900,
+        "y": 1240,
+        "wires": [
+            [
+                "9a54b20bca6d988d"
+            ]
+        ]
+    },
+    {
+        "id": "9a54b20bca6d988d",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 7,
+        "width": "6",
+        "height": "1",
+        "name": "SNR flag text",
+        "label": "SNR above noise floor",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1240,
+        "wires": []
+    },
+    {
+        "id": "b831d5f134656276",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Has actuators",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.has_actuators",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 900,
+        "y": 1280,
+        "wires": [
+            [
+                "e88bf662b362229c"
+            ]
+        ]
+    },
+    {
+        "id": "e88bf662b362229c",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 8,
+        "width": "6",
+        "height": "1",
+        "name": "Has actuators text",
+        "label": "Has actuators",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1280,
+        "wires": []
+    },
+    {
+        "id": "f87a5d657ff02911",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Disable code",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.disablement_code",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 890,
+        "y": 1320,
+        "wires": [
+            [
+                "d4b6fac6db23212c"
+            ]
+        ]
+    },
+    {
+        "id": "d4b6fac6db23212c",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 9,
+        "width": "6",
+        "height": "1",
+        "name": "Disable code text",
+        "label": "Disablement code",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1320,
+        "wires": []
+    },
+    {
+        "id": "07e50808fcfb459c",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Has signed cals",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.has_signed_cals",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 900,
+        "y": 1360,
+        "wires": [
+            [
+                "c6744cc900d83401"
+            ]
+        ]
+    },
+    {
+        "id": "c6744cc900d83401",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "b46d43e259dfd7b6",
+        "order": 10,
+        "width": "6",
+        "height": "1",
+        "name": "Has signed cals text",
+        "label": "Has signed cals",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1360,
+        "wires": []
+    },
+    {
+        "id": "b95ae08afbae0e99",
+        "type": "function",
+        "z": "cb9721485cdb3daa",
+        "name": "Ready states text",
+        "func": "const p = msg.payload;\nfunction f(name, val) {\n    return `${name}=${val === true ? 'OK' : (val === false ? 'NO' : 'UNK')}`;\n}\nconst parts = [\n    f('scp', p.ready_scp),\n    f('l1l2', p.ready_l1l2),\n    f('xphy', p.ready_xphy),\n    f('aap', p.ready_aap),\n    f('rf', p.ready_rf)\n];\nmsg.payload = parts.join(', ');\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 880,
+        "y": 1400,
+        "wires": [
+            [
+                "1a047972e255a8f1"
+            ]
+        ]
+    },
+    {
+        "id": "1a047972e255a8f1",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "7e264cca0226b9b2",
+        "order": 1,
+        "width": "6",
+        "height": "2",
+        "name": "Ready states text",
+        "label": "Ready states",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1400,
+        "wires": []
+    },
+    {
+        "id": "20a1721fd26dcef3",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Dish ID",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.dish_id",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 860,
+        "y": 1440,
+        "wires": [
+            [
+                "9b315237bb47bd67"
+            ]
+        ]
+    },
+    {
+        "id": "9b315237bb47bd67",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "80182e2c993161aa",
+        "order": 1,
+        "width": "6",
+        "height": "1",
+        "name": "Dish ID text",
+        "label": "Dish ID",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1440,
+        "wires": []
+    },
+    {
+        "id": "e7b7e66d6ba0dc4a",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "Serial",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "payload.serial",
+                "tot": "jsonata"
+            }
+        ],
+        "x": 850,
+        "y": 1480,
+        "wires": [
+            [
+                "46a2aa10716c1304"
+            ]
+        ]
+    },
+    {
+        "id": "46a2aa10716c1304",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "80182e2c993161aa",
+        "order": 2,
+        "width": "6",
+        "height": "1",
+        "name": "Serial text",
+        "label": "Serial",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 1180,
+        "y": 1480,
+        "wires": []
+    },
+    {
+        "id": "f04b5d3358a2fe8f",
+        "type": "mqtt in",
+        "z": "cb9721485cdb3daa",
+        "name": "Obstruction %",
+        "topic": "starlink/mini/obstruction_percent",
+        "qos": "0",
+        "datatype": "auto",
+        "broker": "ca0996c5b0e7b825",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 900,
+        "y": 1560,
+        "wires": [
+            [
+                "c0fc1330e9a1ee92"
+            ]
+        ]
+    },
+    {
+        "id": "c0fc1330e9a1ee92",
+        "type": "json",
+        "z": "cb9721485cdb3daa",
+        "name": "Parse obstruction JSON",
+        "property": "payload",
+        "action": "",
+        "pretty": false,
+        "x": 1130,
+        "y": 1560,
+        "wires": [
+            [
+                "f35402fc3ad1c1a9"
+            ]
+        ]
+    },
+    {
+        "id": "f35402fc3ad1c1a9",
+        "type": "function",
+        "z": "cb9721485cdb3daa",
+        "name": "Obstruction value only",
+        "func": "msg.payload = Number(msg.payload.value || 0);\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1410,
+        "y": 1580,
+        "wires": [
+            [
+                "7d8af4e7822cf8a5",
+                "f7ca8e6a266fc42f"
+            ]
+        ]
+    },
+    {
+        "id": "f7ca8e6a266fc42f",
+        "type": "ui_gauge",
+        "z": "cb9721485cdb3daa",
+        "name": "Obstruction gauge",
+        "group": "060daa901ca892b7",
+        "order": 2,
+        "width": "6",
+        "height": "3",
+        "gtype": "gage",
+        "title": "Obstruction (%)",
+        "label": "%",
+        "format": "{{value  | number:0}}",
+        "min": 0,
+        "max": "100",
+        "colors": [
+            "#00b500",
+            "#e6e600",
+            "#ca3838"
+        ],
+        "seg1": "",
+        "seg2": "",
+        "diff": false,
+        "className": "",
+        "x": 1640,
+        "y": 1540,
+        "wires": []
+    },
+    {
+        "id": "7d8af4e7822cf8a5",
+        "type": "ui_chart",
+        "z": "cb9721485cdb3daa",
+        "name": "Obstruction history",
+        "group": "060daa901ca892b7",
+        "order": 3,
+        "width": "6",
+        "height": "3",
+        "label": "Obstruction over time",
+        "chartType": "line",
+        "legend": "false",
+        "xformat": "auto",
+        "interpolate": "linear",
+        "nodata": "",
+        "dot": false,
+        "ymin": "0",
+        "ymax": "100",
+        "removeOlder": "6",
+        "removeOlderPoints": "",
+        "removeOlderUnit": "3600",
+        "cutout": 0,
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#1f77b4",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 1640,
+        "y": 1580,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "78fecb66193462f1",
+        "type": "function",
+        "z": "cb9721485cdb3daa",
+        "name": "function 4",
+        "func": "let sec = msg.payload.obstruction_valid_s;\n\nif (!sec || isNaN(sec)) {\n    msg.payload = \"0s\";\n    return msg;\n}\n\nsec = Number(sec);\nconst days = Math.floor(sec / 86400);\nsec %= 86400;\nconst hours = Math.floor(sec / 3600);\nsec %= 3600;\nconst mins = Math.floor(sec / 60);\nconst secs = Math.floor(sec % 60);\n\nlet out = [];\nif (days > 0) out.push(`${days}d`);\nif (hours > 0) out.push(`${hours}h`);\nif (mins > 0) out.push(`${mins}m`);\nif (secs > 0) out.push(`${secs}s`);\nif (out.length === 0) out.push(\"0s\");\n\nmsg.payload = out.join(\" \");\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1220,
+        "y": 880,
+        "wires": [
+            [
+                "1230febd47f0336e"
+            ]
+        ]
+    },
+    {
+        "id": "06eb73f1e02bd72f",
+        "type": "ui_text",
+        "z": "cb9721485cdb3daa",
+        "group": "fe6e4ba753411670",
+        "order": 2,
+        "width": "6",
+        "height": "1",
+        "name": "Bootcount text",
+        "label": "Bootcount",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 1200,
+        "y": 1520,
+        "wires": []
+    },
+    {
+        "id": "20c2e61e73b835d1",
+        "type": "change",
+        "z": "cb9721485cdb3daa",
+        "name": "bootcount",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "msg.payload.bootcount",
+                "tot": "msg"
+            }
+        ],
+        "x": 870,
+        "y": 1520,
+        "wires": [
+            [
+                "06eb73f1e02bd72f"
+            ]
+        ]
+    },
+    {
+        "id": "a9e4ba8d9b3fe116",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "ADD YOUR MQTT HOST",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "fe6e4ba753411670",
+        "type": "ui_group",
+        "name": "Overview / Connection",
+        "tab": "cbd5fc32c35562d2",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "82f60ef2136fdbc9",
+        "type": "ui_group",
+        "name": "Throughput",
+        "tab": "cbd5fc32c35562d2",
+        "order": 2,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ab8889c39bb8d818",
+        "type": "ui_group",
+        "name": "GPS & Pointing",
+        "tab": "cbd5fc32c35562d2",
+        "order": 3,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "060daa901ca892b7",
+        "type": "ui_group",
+        "name": "Obstruction",
+        "tab": "cbd5fc32c35562d2",
+        "order": 4,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "b46d43e259dfd7b6",
+        "type": "ui_group",
+        "name": "Update & Health",
+        "tab": "cbd5fc32c35562d2",
+        "order": 5,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "7e264cca0226b9b2",
+        "type": "ui_group",
+        "name": "Ready States",
+        "tab": "cbd5fc32c35562d2",
+        "order": 6,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "80182e2c993161aa",
+        "type": "ui_group",
+        "name": "Identity",
+        "tab": "cbd5fc32c35562d2",
+        "order": 7,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ca0996c5b0e7b825",
+        "type": "mqtt-broker",
+        "name": "MQTT 192.168.1.10",
+        "broker": "192.168.1.10",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": ""
+    },
+    {
+        "id": "cbd5fc32c35562d2",
+        "type": "ui_tab",
+        "name": "Starlink Advanced",
+        "icon": "satellite",
+        "order": 37,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "e10fd4caea2a1dd4",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]

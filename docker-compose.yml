@@ -1,0 +1,23 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+
+  starlink-mini-mqtt:
+    image: ghcr.io/n3bkv/starlink-mini-mqtt:latest
+    environment:
+      STARLINK_MQTT_HOST: mosquitto
+      STARLINK_MQTT_PORT: "1883"
+      STARLINK_MQTT_PREFIX: "starlink/mini"
+      STARLINK_POLL_INTERVAL: "30"
+      STARLINK_LOG_LEVEL: "INFO"
+      STARLINK_COOKIE_FILE: "/data/cookies.json"
+      STARLINK_COOKIE_CACHE_DIR: "/cookie_cache"
+    volumes:
+      - ./data:/data:ro
+      - ./cookie_cache:/cookie_cache
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
