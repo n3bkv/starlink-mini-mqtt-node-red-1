@@ -25,16 +25,18 @@ and publishes metrics to **MQTT** for use with Node-RED, Home Assistant, InfluxD
   - `obstructed`
   - `software_version`
   - full raw status JSON
-- Includes bundled Mosquitto (zero networking pain)
+  - Designed for **Node-RED dashboards**
+  - MQTT-friendly (works with Home Assistant, InfluxDB, etc.)
 
 ---
 
 ## Quick Start (Recommended)
 
-### 1) Clone
+## 1) Create working directories
+
 ```bash
-git clone https://github.com/n3bkv/starlink-mini-mqtt-1
-cd starlink-mini-mqtt-1
+mkdir -p starlink-mini-mqtt/data starlink-mini-mqtt/cookie_cache
+cd starlink-mini-mqtt
 ```
 
 ### 2) Export cookies from starlink.com
@@ -49,25 +51,27 @@ cp data/cookies.json.example data/cookies.json
 
 ---
 
-### 3) Quick Start
-
-
-```bash
-git clone https://github.com/n3bkv/starlink-mini-mqtt-1
-cd starlink-mini-mqtt-1
-
-mkdir -p data cookie_cache
-cp data/cookies.json.example data/cookies.json
-# Replace data/cookies.json with your exported Starlink cookies
-
-docker compose up -d
-docker compose logs -f starlink-mini-mqtt-1
+### 3) Create docker-compose.yml
 
 ```
+services:
+  starlink-mini-mqtt:
+    image: ghcr.io/n3bkv/starlink-mini-mqtt-1:latest
+    container_name: starlink-mini-mqtt
+    restart: unless-stopped
+    volumes:
+      - ./data:/data
+      - ./cookie_cache:/cookie_cache
+    environment:
+      STARLINK_MQTT_HOST: replace with your host ip
+      STARLINK_MQTT_PORT: 1883
+```
 
-### 4) View logs
+### 4) Start the container
 ```bash
-docker compose logs -f starlink-mini-mqtt-1
+docker compose up -d
+docker compose logs -f starlink-mini-mqtt
+
 ```
 
 ---
@@ -100,7 +104,8 @@ Payload example:
 
 ## Sample Node-RED Flow
 
-Check out a sample Node-RED flow of the available data - starlink-stats-node-red.json
+A sample Node-RED flow is included: starlink-stats-node-red.json
+Import it into Node-RED to visualize metrics immediately.
 
 ---
 ## Configuration (Environment Variables)
@@ -136,6 +141,16 @@ STARLINK_MQTT_HOST=host.docker.internal
 - Rotate cookies periodically
 
 ---
+
+## Development / Customization
+
+```bash
+git clone https://github.com/n3bkv/starlink-mini-mqtt-node-red-1
+cd starlink-mini-mqtt-node-red-1
+
+```
+
+
 
 ## License
 MIT
