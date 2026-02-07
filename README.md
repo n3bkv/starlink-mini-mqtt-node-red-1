@@ -52,25 +52,28 @@ cp data/cookies.json.example data/cookies.json
 ---
 
 ### 3) Create docker-compose.yml
+**This example code assumes you already have an MQTT broker**
 
 ```
 services:
-  starlink-mini-mqtt:
+services:
+  starlink-mini-mqtt-1:
     image: ghcr.io/n3bkv/starlink-mini-mqtt-1:latest
-    container_name: starlink-mini-mqtt
+    container_name: starlink-mini-mqtt-1
     restart: unless-stopped
     volumes:
-      - ./data:/data
+      - ./data:/data:ro
       - ./cookie_cache:/cookie_cache
     environment:
-      STARLINK_MQTT_HOST: replace with your host ip
-      STARLINK_MQTT_PORT: 1883
+      STARLINK_MQTT_HOST: 192.168.1.10   # your broker
+      STARLINK_MQTT_PORT: "1883"
+
 ```
 
 ### 4) Start the container
 ```bash
 docker compose up -d
-docker compose logs -f starlink-mini-mqtt
+docker compose logs -f starlink-mini-mqtt-1
 
 ```
 
