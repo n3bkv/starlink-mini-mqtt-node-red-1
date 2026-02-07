@@ -1,0 +1,9 @@
+cookies.json
+cookie_cache/
+__pycache__/
+*.pyc
+.git/
+.DS_Store
+venv/
+.venv/
+
