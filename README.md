@@ -33,7 +33,7 @@ and publishes metrics to **MQTT** for use with Node-RED, Home Assistant, InfluxD
 
 ### 1) Clone
 ```bash
-git clone https://github.com/YOUR_GITHUB_USER/starlink-mini-mqtt
+git clone https://github.com/n3bkv/starlink-mini-mqtt
 cd starlink-mini-mqtt
 ```
 
