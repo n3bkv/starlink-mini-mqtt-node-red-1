@@ -33,8 +33,8 @@ and publishes metrics to **MQTT** for use with Node-RED, Home Assistant, InfluxD
 
 ### 1) Clone
 ```bash
-git clone https://github.com/n3bkv/starlink-mini-mqtt
-cd starlink-mini-mqtt
+git clone https://github.com/n3bkv/starlink-mini-mqtt-1
+cd starlink-mini-mqtt-1
 ```
 
 ### 2) Export cookies from starlink.com
@@ -53,21 +53,21 @@ cp data/cookies.json.example data/cookies.json
 
 
 ```bash
-git clone https://github.com/n3bkv/starlink-mini-mqtt
-cd starlink-mini-mqtt
+git clone https://github.com/n3bkv/starlink-mini-mqtt-1
+cd starlink-mini-mqtt-1
 
 mkdir -p data cookie_cache
 cp data/cookies.json.example data/cookies.json
 # Replace data/cookies.json with your exported Starlink cookies
 
 docker compose up -d
-docker compose logs -f starlink-mini-mqtt
+docker compose logs -f starlink-mini-mqtt-1
 
 ```
 
 ### 4) View logs
 ```bash
-docker compose logs -f starlink-mini-mqtt
+docker compose logs -f starlink-mini-mqtt-1
 ```
 
 ---
