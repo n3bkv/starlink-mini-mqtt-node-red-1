@@ -56,7 +56,6 @@ cp data/cookies.json.example data/cookies.json
 
 ```
 services:
-services:
   starlink-mini-mqtt-1:
     image: ghcr.io/n3bkv/starlink-mini-mqtt-1:latest
     container_name: starlink-mini-mqtt-1
