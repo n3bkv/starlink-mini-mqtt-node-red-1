@@ -14,7 +14,7 @@ from http.cookiejar import Cookie
 from starlink_client.account import Account
 
 # API URLs
-STARLINK_GRPC_WEB_API_URL = "https://api2.starlink.com/SpaceX.API.Device.Device/Handle"
+STARLINK_GRPC_WEB_API_URL = "https://api.starlink.com/SpaceX.API.Device.Device/Handle"
 STARLINK_AUTH_URL = "https://api.starlink.com/auth-rp/auth/user"
 
 # Constants
