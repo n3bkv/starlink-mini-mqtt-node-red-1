@@ -1,4 +1,4 @@
-# Starlink Mini → MQTT Bridge/Node-RED Dashbaord
+# Starlink Mini → MQTT Bridge/Node-RED Dashboard
 
 A Docker-friendly bridge and example Node-RED flow that polls **Starlink Mini** dish status via the Starlink cloud
 and publishes metrics to **MQTT** for use with Node-RED, Home Assistant, InfluxDB, etc.
@@ -18,6 +18,15 @@ This project includes compatibility patches for:
 - The required `Origin: https://starlink.com` request header
 
 These patches are included automatically in the Docker image.
+
+### Docker Images
+
+Prebuilt images are published to GitHub Container Registry:
+
+`ghcr.io/n3bkv/starlink-mini-mqtt-1`
+
+The `latest` tag tracks the current `main` branch. Version tags such as `v0.1.1` also publish versioned images. Images are built for both `linux/amd64` and `linux/arm64`, including 64-bit Raspberry Pi systems.
+
 
 ---
 
@@ -49,6 +58,7 @@ These patches are included automatically in the Docker image.
 
 ```bash
 mkdir -p starlink-mini-mqtt/data starlink-mini-mqtt/cookie_cache
+sudo chown 10001:10001 starlink-mini-mqtt/cookie_cache
 cd starlink-mini-mqtt
 ```
 
@@ -74,8 +84,8 @@ services:
     container_name: starlink-mini-mqtt-1
     restart: unless-stopped
     volumes:
-      - ./data:/data:ro
-      - ./cookie_cache:/cookie_cache
+      - ./data/cookies.json:/data/cookies.json:ro
+      - ./cookie_cache:/data/cookie_cache
     environment:
       STARLINK_MQTT_HOST: 192.168.1.10   # your broker
       STARLINK_MQTT_PORT: "1883"
@@ -127,15 +137,15 @@ Import it into Node-RED to visualize metrics immediately.
 
 | Variable | Default |
 |--------|---------|
-| STARLINK_MQTT_HOST | `mosquitto` |
+| STARLINK_MQTT_HOST | `localhost` |
 | STARLINK_MQTT_PORT | `1883` |
 | STARLINK_MQTT_PREFIX | `starlink/mini` |
 | STARLINK_POLL_INTERVAL | `30` |
 | STARLINK_LOG_LEVEL | `INFO` |
 | STARLINK_COOKIE_FILE | `/data/cookies.json` |
-| STARLINK_COOKIE_CACHE_DIR | `/cookie_cache` |
+| STARLINK_COOKIE_CACHE_DIR | `/data/cookie_cache` |
 
-Important - Make sure to edit your mqtt broker host IP into the docker-compose.yml file to replace the 'mosquitto' placeholder.
+When using the included `docker-compose.yml`, `STARLINK_MQTT_HOST` is set to `mosquitto`. If you use an external MQTT broker, set it to that broker's hostname or IP address.
 
 ---
 
