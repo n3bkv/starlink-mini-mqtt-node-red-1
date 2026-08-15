@@ -1,0 +1,21 @@
+# Starlink credentials
+cookies.json
+data/cookies.json
+
+# Runtime cookie cache
+cookie_cache/
+data/cookie_cache/
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment/secrets
+.env
+.env.*
+
+# OS/editor
+.DS_Store
