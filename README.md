@@ -6,6 +6,19 @@ and publishes metrics to **MQTT** for use with Node-RED, Home Assistant, InfluxD
 > ⚠️ This project uses unofficial Starlink endpoints.
 > It may break if Starlink changes their backend.
 
+## August 2026 Starlink API Compatibility
+
+Starlink changed portions of its cloud API in August 2026.
+
+This project includes compatibility patches for:
+
+- Starlink authentication responses that may omit `canManageClients`
+- The current gRPC-Web endpoint:
+  `https://starlink.com/api/SpaceX.API.Device.Device/Handle`
+- The required `Origin: https://starlink.com` request header
+
+These patches are included automatically in the Docker image.
+
 ---
 
 # Screenshot
